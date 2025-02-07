@@ -1,3 +1,4 @@
+![](img/banner.png)
 # NetScanX
 ### Nmap Useful Script
 
@@ -26,3 +27,5 @@ sudo mv NetScanX /usr/local/bin/
 ## Run it
 
 Open a terminal (Linux, macOS) and execute NetScanX! ... Very simple, right?
+
+![](img/start.png)
