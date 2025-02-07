@@ -1,151 +1,303 @@
 #!/bin/bash
 
-# Pulizia dello schermo
-clear
-
-# Colori per i messaggi
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
+# Colors for messages
 YELLOW='\033[0;33m'
-NC='\033[0m' # Nessun colore
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+MAGENTA='\033[0;35m'
+WHITE='\033[1;37m'
+NC='\033[0m' # No color
 
-# Funzione per verificare il formato della subnet in CIDR
+# Function to clear the screen and display the banner
+function show_banner() {
+    # Clear the screen
+    clear
+
+    # ASCII Art
+    echo -e "${WHITE}"
+    cat << "EOF"
+     __     _   __                __  __
+  /\ \ \___| |_/ _\ ___ __ _ _ __ \ \/ /
+ /  \/ / _ \ __\ \ / __/ _` | '_ \ \  / 
+/ /\  /  __/ |__\ \ (_| (_| | | | |/  \ 
+\_\ \/ \___|\__\__/\___\__,_|_| |_/_/\_\
+EOF
+    echo -e "${NC}" # Reset to normal color
+}
+
+# Function to check if the subnet format is valid (CIDR)
 function is_valid_cidr() {
     [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$ ]]
 }
 
-# Funzione per ottenere tutte le subnet attive (compatibile con macOS)
+# Function to check if the IP format is valid
+function is_valid_ip() {
+    [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+}
+
+# Function to get all active subnets (compatible with macOS)
 function get_active_subnets() {
     ifconfig | awk '/inet / && !/127.0.0.1/ {print $2"/24"}'
 }
 
-# Funzione per mostrare una progress bar
+# Function to show a progress bar
 function show_progress() {
     local pid=$1
     local delay=0.1
     local spinstr='|/-\\'
-    tput civis  # Nasconde il cursore
-    echo -ne "${YELLOW}Scansione in corso${NC} "
+    tput civis  # Hide cursor
+    echo -e "${MAGENTA}Scanning $SELECTED_TARGET${NC} "
     while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
         local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
+        printf " ${WHITE}[%c]  ${NC}" "$spinstr"
         spinstr=$temp${spinstr%"$temp"}
         sleep $delay
         printf "\b\b\b\b\b\b"
     done
-    tput cnorm  # Ripristina il cursore
-    echo -e "${GREEN}Fatto!${NC}"
+    tput cnorm  # Show cursor
+    echo -e " ${WHITE}[*] ${CYAN}Done!${NC}"
 }
 
-# Ottieni tutte le subnet attive
+# Call the banner
+show_banner
+
+# Get all active subnets
 ACTIVE_SUBNETS=($(get_active_subnets))
 
-# Mostra le subnet attive trovate
-echo -e "${BLUE}I: Subnet attive trovate:${NC}"
+# Display found active subnets
+echo -e "${GREEN}Active subnets found:${NC}"
 if [ ${#ACTIVE_SUBNETS[@]} -eq 0 ]; then
-    echo -e "${RED}I: Nessuna rete attiva trovata. Puoi inserire una subnet manualmente.${NC}"
+    echo -e "${RED}No active network found. You can manually enter a subnet or a single IP.${NC}"
 else
     for i in "${!ACTIVE_SUBNETS[@]}"; do
-        echo "  [$((i+1))] ${ACTIVE_SUBNETS[$i]}"
+        echo -e " ${WHITE}[$((i+1))] ${MAGENTA}${ACTIVE_SUBNETS[$i]}${NC}"
     done
 fi
-echo "  [M] Inserisci manualmente una subnet"
-echo "  [Q] Esci dallo script"
+echo -e " ${WHITE}[M]${MAGENTA} Manually enter a subnet or a single IP${NC}"
+echo -e " ${WHITE}[Q]${MAGENTA} Exit the script${NC}"
 
-# Chiedi all'utente di scegliere una subnet
+# Ask the user to choose a subnet or manually enter one
 while true; do
-    read -p "$(echo -e "${BLUE}D: Scegli una subnet o inserisci manualmente (1/.../M/Q): ${NC}")" scelta
-    if [[ "$scelta" == "Q" || "$scelta" == "q" ]]; then
-        echo -e "${YELLOW}I: Uscita dallo script.${NC}"
+    read -p "$(echo -e "${YELLOW}Choose (1/.../M/Q): ${NC}")" choice
+    if [[ "$choice" == "Q" || "$choice" == "q" ]]; then
+        show_banner
+        echo -e "${GREEN}Exiting...${NC}"
+        echo -e "${MAGENTA}Thank you for using NetScanX.${NC}"
+        echo
         exit 0
-    elif [[ "$scelta" =~ ^[1-9][0-9]*$ && $scelta -ge 1 && $scelta -le ${#ACTIVE_SUBNETS[@]} ]]; then
-        SELECTED_SUBNET=${ACTIVE_SUBNETS[$((scelta-1))]}
-        echo -e "${GREEN}I: Hai selezionato la subnet ${SELECTED_SUBNET}.${NC}"
+    elif [[ "$choice" =~ ^[1-9][0-9]*$ && $choice -ge 1 && $choice -le ${#ACTIVE_SUBNETS[@]} ]]; then
+        SELECTED_TARGET=${ACTIVE_SUBNETS[$((choice-1))]}
+        echo -e "${GREEN}You have selected the subnet ${SELECTED_TARGET}.${NC}"
         break
-    elif [[ "$scelta" == "M" || "$scelta" == "m" ]]; then
+    elif [[ "$choice" == "M" || "$choice" == "m" ]]; then
         while true; do
-            read -p "$(echo -e "${BLUE}D: Inserisci la subnet in formato CIDR (esempio: 192.168.1.0/24): ${NC}")" MANUAL_SUBNET
-            if is_valid_cidr "$MANUAL_SUBNET"; then
-                SELECTED_SUBNET=$MANUAL_SUBNET
-                echo -e "${GREEN}I: Subnet inserita correttamente: ${SELECTED_SUBNET}.${NC}"
+            read -p "$(echo -e "${YELLOW}Enter a subnet or a single IP: ${NC}")" MANUAL_INPUT
+            if is_valid_cidr "$MANUAL_INPUT"; then
+                SELECTED_TARGET=$MANUAL_INPUT
+                echo -e "${GREEN}Subnet entered correctly: ${SELECTED_TARGET}.${NC}"
+                break 2
+            elif is_valid_ip "$MANUAL_INPUT"; then
+                SELECTED_TARGET=$MANUAL_INPUT
+                echo -e "${GREEN}Single IP entered correctly: ${SELECTED_TARGET}.${NC}"
                 break 2
             else
-                echo -e "${RED}I: Formato CIDR non valido. Riprova.${NC}"
+                echo -e "${RED}Invalid format. Please try again.${NC}"
             fi
         done
     else
-        echo -e "${RED}I: Scelta non valida. Riprova.${NC}"
+        echo -e "${RED}Invalid choice. Please try again.${NC}"
     fi
 done
 
-SUBNET=$SELECTED_SUBNET
+# ****************
+# After selectrion
+# ****************
 
-# Genera il nome del file di output per la scansione degli host
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-OUTPUT_FILE="$HOME/scan_host_$TIMESTAMP.txt"
-echo -e "${GREEN}I: Il file per la scansione degli host sarà salvato in $OUTPUT_FILE${NC}"
+# If the selection is a subnet, perform host scanning
+if [[ "$SELECTED_TARGET" =~ / ]]; then
+    while true; do
+        # Generate host list in a file with timestamp
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        HOST_LIST="$HOME/host_list_$TIMESTAMP.txt"
+        nmap -sn -oG - "$SELECTED_TARGET" -vv | grep Up | awk -F " " '{print $2}' > "$HOST_LIST" &
+        host_scan_pid=$!
 
-# Esegui nmap sulla subnet e salva il risultato nel file di output
-echo -e "${YELLOW}I: Scansione della subnet $SUBNET in corso...${NC}"
-nmap -sn -oG - "$SUBNET" -vv | grep Up | awk -F " " '{print $2}' > "$OUTPUT_FILE" &
-host_scan_pid=$!
+        # Show progress bar during host scan
+        show_progress $host_scan_pid
+        wait $host_scan_pid
 
-# Mostra la progress bar durante la scansione degli host
-show_progress $host_scan_pid
+        # Check if the file was created successfully
+        if [ -f "$HOST_LIST" ]; then
+            echo -e "${GREEN}Scan completed. Results saved in ${YELLOW}$HOST_LIST${NC}"
 
-# Controlla se il file è stato creato con successo
-if [ -f "$OUTPUT_FILE" ]; then
-    echo -e "${GREEN}I: Scansione completata. Risultati salvati in $OUTPUT_FILE${NC}"
+            # Display the detected IP list
+            echo -e "${CYAN}Detected IPs:${NC}"
+            cat "$HOST_LIST"
+        
+            # Ask the user what to do next
+            while true; do
+                echo -e "${GREEN}What would you like to do next:${NC}"
+                echo -e " ${WHITE}[1]${MAGENTA} Repeat host detection"
+                echo -e " ${WHITE}[2]${MAGENTA} Scan 100 standard ports of detected hosts (faster time)" # -F
+                echo -e " ${WHITE}[3]${MAGENTA} Scan ALL ports of detected hosts (longer time)" # -p-
+                echo -e " ${WHITE}[Q]${MAGENTA} Exit the script${NC}"
+                read -p "$(echo -e "${YELLOW}Choose (1/.../Q): ${NC}")" choice
+                choice=${choice:-1} # Set "1" as the default choice
+                if [[ "$choice" == "Q" || "$choice" == "q" ]]; then
+                    break 2 # exit 0
+                elif [[ "$choice" == "3" ]]; then
+                    while true; do
+                        # Start port scanning on detected IPs
+                        echo -e "${GREEN}Scanning ports for detected IPs...${NC}"
+                        PORT_SCAN_FILE="$HOME/scan_ports_$TIMESTAMP.txt"
+                        nmap -iL "$HOST_LIST" -p- -oN - > "$PORT_SCAN_FILE" &
+                        port_scan_pid=$!
 
-# Chiedi all'utente se vuole visualizzare l'elenco degli host
-while true; do
-    echo -e "${BLUE}I: Cosa vuoi fare adesso:${NC}"
-    echo "  [S] Scansione delle porte degli host rilevati"
-    echo "  [L] Lista degli IP rilevati"
-    read -p "$(echo -e "${BLUE}D: Scegli (S/L) ${NC}")" scelta
-    if [[ "$scelta" == "s" || "$scelta" == "S" ]]; then
-        break
-    elif [[ "$scelta" == "l" || "$scelta" == "L" ]]; then
-        cat "$OUTPUT_FILE"
-        exit 0 # Interrompe lo script
-    else
-        echo -e "${RED}I: Scelta non valida. Riprova.${NC}"
-    fi
-done
+                        # Show progress bar during port scanning
+                        show_progress $port_scan_pid
+                        wait $port_scan_pid
 
-    # Genera il nome del file di output per la scansione delle porte
-    DETTAGLIATO_FILE="$HOME/scan_port_$TIMESTAMP.txt"
-    echo -e "${GREEN}I: Il file per la scansione delle porte sarà salvato in $DETTAGLIATO_FILE${NC}"
+                        # Print results to monitor
+                        echo -e "${CYAN}Port scan completed.${NC}"
+                        echo -e "${CYAN}Port scan results:${NC}"
+                        cat "$PORT_SCAN_FILE"
+                        echo
 
-    # Esegui un secondo nmap usando l'output precedente come input e salva i risultati dettagliati
-    echo -e "${YELLOW}I: Esecuzione di nmap con input dal file $OUTPUT_FILE...${NC}"
+                        # Ask how to proceed
+                        while true; do
+                            echo -e "${GREEN} What would you like to do next:${NC}"
+                            echo -e " ${WHITE}[1]${MAGENTA} Repeat the scan${NC}"
+                            echo -e " ${WHITE}[2]${MAGENTA} View the results file${NC}"
+                            echo -e " ${WHITE}[Q]${MAGENTA} Exit ...${NC}"
+                            read -p "$(echo -e "${YELLOW}Choose (1/.../Q): ${NC}")" choice
+                            choice=${choice:-1} # Set "1" as the default choice
+                            if [[ "$choice" == "Q" || "$choice" == "q" ]]; then
+                                break 2
+                            elif [[ "$choice" == "2" ]]; then
+                                less "$PORT_SCAN_FILE"
+                                break 2
+                            elif [[ "$choice" == "1" ]]; then
+                                echo -e "${GREEN}Great, you chose to repeat the scan...${NC}"
+                                break 
+                            else
+                                echo -e "${RED}Invalid choice. Please try again.${NC}"
+                            fi
+                        done
+                    done
+                break 2
+                elif [[ "$choice" == "2" ]]; then
+                    while true; do
+                        # Start ALL ports scanning on detected IPs
+                        echo -e "${GREEN}Scanning ports for detected IPs...${NC}"
+                        PORT_SCAN_FILE="$HOME/scan_ports_$TIMESTAMP.txt"
+                        nmap -iL "$HOST_LIST" -F -oN - > "$PORT_SCAN_FILE" &
+                        port_scan_pid=$!
 
-    # Esegui nmap in background
-    nmap -iL "$OUTPUT_FILE" -oN "$DETTAGLIATO_FILE" &
-    nmap_pid=$!
+                        # Show progress bar during port scanning
+                        show_progress $port_scan_pid
+                        wait $port_scan_pid
 
-    # Mostra la progress bar durante l'esecuzione
-    show_progress $nmap_pid
+                        # Print results to monitor
+                        echo -e "${CYAN}Port scan completed.${NC}"
+                        echo -e "${CYAN}Port scan results:${NC}"
+                        cat "$PORT_SCAN_FILE"
+                        echo
 
-    # Controlla se il file dettagliato è stato creato con successo
-    if [ -f "$DETTAGLIATO_FILE" ]; then
-        echo -e "${GREEN}I: Scansione dettagliata completata. Risultati salvati in $DETTAGLIATO_FILE${NC}"
-
-        # Chiedi all'utente se vuole aprire il file dettagliato
-        read -p "$(echo -e "${BLUE}D: Vuoi aprire il file dei risultati dettagliati? [S/n] ${NC}")" apri_file
-        apri_file=${apri_file:-S} # Imposta "S" come scelta predefinita
-
-        if [[ "$apri_file" == "s" || "$apri_file" == "S" ]]; then
-            less "$DETTAGLIATO_FILE"
+                        # Ask how to proceed
+                        while true; do
+                            echo -e "${GREEN}What would you like to do next:${NC}"
+                            echo -e " ${WHITE}[1]${MAGENTA} Repeat the scan${NC}"
+                            echo -e " ${WHITE}[2]${MAGENTA} View the results file${NC}"
+                            echo -e " ${WHITE}[Q]${MAGENTA} End ...${NC}"
+                            read -p "$(echo -e "${YELLOW}Choose (1/.../Q): ${NC}")" choice
+                            choice=${choice:-1} # Set "1" as the default choice
+                            if [[ "$choice" == "Q" || "$choice" == "q" ]]; then
+                                break 2 # exit 0
+                            elif [[ "$choice" == "2" ]]; then
+                                less "$PORT_SCAN_FILE"
+                                break 2
+                            elif [[ "$choice" == "1" ]]; then
+                                echo -e "${GREEN}Great, you chose to repeat the scan...${NC}"
+                                break 
+                            else
+                                echo -e "${RED}Invalid choice. Please try again.${NC}"
+                            fi
+                        done
+                    done
+                    break 2
+                elif [[ "$choice" == "1" ]]; then
+                    echo -e "${GREEN}Great, you chose to repeat the scan...${NC}"
+                    break
+                else
+                    echo -e "${RED}Invalid choice. Please try again.${NC}"
+                fi
+            done
         else
-            echo -e "${YELLOW}I: File non aperto. Puoi trovarlo qui: $DETTAGLIATO_FILE${NC}"
+            echo -e "${RED}Error: the file $HOST_LIST was not created.${NC}"
+            exit 3
         fi
-    else
-        echo -e "${RED}I: Errore: il file $DETTAGLIATO_FILE non è stato creato.${NC}"
-        exit 4
-    fi
+    done
+else                # If it's a single IP, proceed directly to port scanning
+    while true; do
+        echo -e "${GREEN}Performing full port scan for IP $SELECTED_TARGET...${NC}"
+        PORT_SCAN_FILE="$HOME/scan_port_$TIMESTAMP.txt"
+
+        # Perform port scan directly on the IP
+        nmap -p- "$SELECTED_TARGET" -oN - > "$PORT_SCAN_FILE" &
+        nmap_pid=$!
+
+        # Show progress bar during port scan
+        show_progress $nmap_pid
+        wait $nmap_pid
+
+        # Check if the file was created successfully
+        if [ -f "$PORT_SCAN_FILE" ]; then
+            # Print results to monitor
+            echo -e "${GREEN}Port scan completed. Results saved in ${YELLOW}$PORT_SCAN_FILE${NC}"
+            echo -e "${CYAN}Port scan results:${NC}"
+            cat "$PORT_SCAN_FILE"
+            echo
+
+            # Ask how to proceed
+            while true; do
+                echo -e "${GREEN}What would you like to do next:${NC}"
+                echo -e " ${WHITE}[1]${MAGENTA} Repeat the scan${NC}"
+                echo -e " ${WHITE}[2]${MAGENTA} View the results file${NC}"
+                echo -e " ${WHITE}[Q]${MAGENTA} End ...${NC}"
+                read -p "$(echo -e "${YELLOW}Choose (1/.../Q): ${NC}")" choice
+                choice=${choice:-1} # Set "1" as the default choice
+                if [[ "$choice" == "Q" || "$choice" == "q" ]]; then
+                    break 2 # exit 0
+                elif [[ "$choice" == "2" ]]; then
+                    less "$PORT_SCAN_FILE"
+                    break 2
+                elif [[ "$choice" == "1" ]]; then
+                    echo -e "${GREEN}Great, you chose to repeat the scan...${NC}"
+                    break
+                else
+                    echo -e "${RED}Invalid choice. Please try again.${NC}"
+                fi
+            done
+        else
+            echo -e "${RED}Error: the file $PORT_SCAN_FILE was not created.${NC}"
+            exit 3
+        fi
+    done
+fi
+
+# End of the script
+echo
+echo -e "${GREEN}Operations completed. Would you like to repeat the script from the beginning? (S/n)${NC}"
+read -p "$(echo -e "${YELLOW}Choose (S/n): ${NC}")" repeat
+repeat=${repeat:-S} # Set "S" as the default choice
+
+if [[ "$repeat" == "s" || "$repeat" == "S" ]]; then
+    exec "$0" # Relaunch the script
 else
-    echo -e "${RED}I: Errore: il file $OUTPUT_FILE non è stato creato.${NC}"
-    exit 3
+    show_banner
+    echo -e "${GREEN}Exiting...${NC}"
+    echo -e "${MAGENTA}Thank you for using NetScanX.${NC}"
+    echo
+    exit 0
 fi
