@@ -12,14 +12,17 @@ In case a single IP is entered, obviously the scan of active hosts is not perfor
 ## Download and Use
 In a terminal (linux or macOS), copy and past following lines:
 
-```` bash
-get https://github.com/AndOrNot77/NetScanX/blob/main/NetScanX
 ````
-Move the file on this path:
-```` bash
-mv NetScanX /urs/local/bin/NetScanX
+git clone https://github.com/AndOrNot77/NetScanX.git
 ````
+Then, ... :
+````
+cd NetScanX
+chmod +x NetScanX
+sudo mv NetScanX /usr/local/bin/
+````
+... and instert password when (or if) required.
 
 ## Run it
 
-Open a terminal (Linux, macOS) and write NetScanX! ... Very simple, right?
+Open a terminal (Linux, macOS) and execute NetScanX! ... Very simple, right?
