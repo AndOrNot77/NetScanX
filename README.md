@@ -29,3 +29,5 @@ sudo mv NetScanX /usr/local/bin/
 Open a terminal (Linux, macOS) and execute NetScanX! ... Very simple, right?
 
 ![](img/start.png)
+![](img/execution.png)
+
